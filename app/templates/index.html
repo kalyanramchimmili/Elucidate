@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}ELUCIDATE // LIBRARY{% endblock %}
+
+{% block nav_items %}
+<span class="nav-item">LIBRARY</span>
+{% endblock %}
+
+{% block nav_right %}
+<button class="btn" id="uploadBtn">[ + UPLOAD PDF ]</button>
+<input type="file" id="fileInput" accept=".pdf" style="display:none" onchange="handleUpload(this)" />
+{% endblock %}
+
+{% block head %}
+<style>
+  .library {
+    padding: 40px 32px;
+    min-height: calc(100vh - 52px);
+  }
+
+  /* ── Header row ── */
+  .lib-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .lib-title {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .lib-count {
+    font-size: 10px;
+    color: var(--border-2);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── Grid ── */
+  .pdf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+  }
+
+  /* ── Card ── */
+  .pdf-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 18px 16px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
+    position: relative;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .pdf-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: var(--cyan);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .pdf-card:hover {
+    border-color: var(--cyan);
+    background: var(--surface-2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,212,255,0.08);
+  }
+
+  .pdf-card:hover::after { opacity: 1; }
+
+  .pdf-card:hover .pdf-name { color: #fff; }
+  .pdf-card:hover .pdf-icon { color: var(--cyan); }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .pdf-icon {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .token-badge {
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    background: var(--bg);
+  }
+
+  .token-badge.has-tokens {
+    color: var(--cyan);
+    border-color: rgba(0,212,255,0.25);
+    background: var(--cyan-dim);
+  }
+
+  .pdf-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--bright);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    min-height: 2.2em;
+  }
+
+  .pdf-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pdf-ext {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Empty state — centered, full area ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 180px);
+    gap: 14px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .empty-icon {
+    font-size: 36px;
+    color: var(--border-2);
+    font-weight: 300;
+    margin-bottom: 4px;
+  }
+
+  .empty-title {
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+  }
+
+  .empty-hint {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Upload overlay ── */
+  .upload-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,10,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 500;
+    backdrop-filter: blur(2px);
+  }
+
+  .upload-overlay.active { display: flex; }
+
+  .upload-status {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: var(--cyan);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 12px 28px;
+    background: var(--surface);
+  }
+
+  .blink { animation: blink 1s step-end infinite; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="library">
+  <!-- Header — only shown when PDFs exist -->
+  <div class="lib-header" id="libHeader" style="display:none">
+    <span class="lib-title">// documents</span>
+    <span class="lib-count" id="libCount"></span>
+  </div>
+
+  <!-- PDF grid — only shown when PDFs exist -->
+  <div class="pdf-grid" id="pdfGrid" style="display:none"></div>
+
+  <!-- Empty state — shown when no PDFs, hidden once PDFs load -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">[ ]</div>
+    <div class="empty-title">// no documents found</div>
+    <div class="empty-hint">upload a pdf to get started</div>
+  </div>
+</main>
+
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-status">// ingesting document<span class="blink">_</span></div>
+</div>
+
+<script>
+  document.getElementById('uploadBtn').onclick = () =>
+    document.getElementById('fileInput').click();
+
+  async function loadPdfs() {
+    try {
+      const res  = await fetch('/api/pdfs');
+      const data = await res.json();
+      renderGrid(data.pdfs || []);
+    } catch(e) {
+      renderGrid([]);
+    }
+  }
+
+  function renderGrid(pdfs) {
+    const grid   = document.getElementById('pdfGrid');
+    const empty  = document.getElementById('emptyState');
+    const header = document.getElementById('libHeader');
+    const count  = document.getElementById('libCount');
+
+    if (pdfs.length === 0) {
+      grid.style.display   = 'none';
+      header.style.display = 'none';
+      empty.style.display  = 'flex';
+      return;
+    }
+
+    empty.style.display  = 'none';
+    header.style.display = 'flex';
+    grid.style.display   = 'grid';
+    count.textContent    = `( ${pdfs.length} )`;
+    grid.innerHTML       = '';
+
+    pdfs.forEach((pdf, i) => {
+      const name     = pdf.name || pdf;
+      const ingested = pdf.ingested !== undefined ? pdf.ingested : true;
+      const tokens   = pdf.tokens || 0;
+      const display  = name.replace(/\.pdf$/i, '');
+
+      const card = document.createElement('div');
+      card.className = 'pdf-card';
+      card.style.animationDelay = `${i * 0.05}s`;
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="pdf-icon">[ PDF ]</span>
+          <span class="token-badge ${tokens > 0 ? 'has-tokens' : ''}">${formatTokens(tokens)}</span>
+        </div>
+        <div class="pdf-name" title="${name}">${display}</div>
+        <div class="pdf-meta">
+          <span class="pdf-ext">.pdf</span>
+          <span class="tag ${ingested ? 'tag-ok' : 'tag-pending'}">${ingested ? '// ingested' : '// pending'}</span>
+        </div>
+      `;
+      card.onclick = () => window.location.href = '/' + encodeURIComponent(name);
+      grid.appendChild(card);
+    });
+  }
+
+  async function handleUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+
+    document.getElementById('uploadOverlay').classList.add('active');
+
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('pdf_name', file.name);
+
+      const res = await fetch('/api/initialise', { method: 'POST', body: fd });
+
+      if (res.ok) {
+        showToast('// document ingested', 'ok');
+        await loadPdfs();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast('// error: ' + (err.error || res.statusText), 'err');
+      }
+    } catch(e) {
+      showToast('// upload failed: ' + e.message, 'err');
+    } finally {
+      document.getElementById('uploadOverlay').classList.remove('active');
+    }
+  }
+
+  function formatTokens(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M tok';
+    if (n >= 1000)    return (n / 1000).toFixed(1) + 'k tok';
+    return n + ' tok';
+  }
+
+  loadPdfs();
+</script>
+{% endblock %}

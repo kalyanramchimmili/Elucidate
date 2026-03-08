@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}ELUCIDATE // 404{% endblock %}
+
+{% block head %}
+<style>
+  .error-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 52px);
+    gap: 24px;
+    text-align: center;
+    padding: 40px;
+  }
+
+  .err-code {
+    font-size: 96px;
+    font-weight: 700;
+    color: var(--bg-3);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    position: relative;
+    user-select: none;
+  }
+
+  /* glitch effect */
+  .err-code::before,
+  .err-code::after {
+    content: '404';
+    position: absolute;
+    inset: 0;
+  }
+
+  .err-code::before {
+    color: var(--cyan);
+    clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
+    animation: glitch-a 3s infinite;
+    opacity: 0.5;
+  }
+
+  .err-code::after {
+    color: #ff4466;
+    clip-path: polygon(0 60%, 100% 60%, 100% 75%, 0 75%);
+    animation: glitch-b 3s infinite;
+    opacity: 0.4;
+  }
+
+  @keyframes glitch-a {
+    0%, 90%, 100% { transform: translate(0); }
+    92%           { transform: translate(-4px, 1px); }
+    94%           { transform: translate(3px, -1px); }
+    96%           { transform: translate(-2px, 0); }
+  }
+
+  @keyframes glitch-b {
+    0%, 88%, 100% { transform: translate(0); }
+    90%           { transform: translate(3px, 2px); }
+    93%           { transform: translate(-3px, -1px); }
+    95%           { transform: translate(2px, 1px); }
+  }
+
+  .err-label {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .err-msg {
+    font-size: 13px;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+    max-width: 360px;
+    line-height: 1.8;
+  }
+
+  .err-msg span {
+    color: var(--cyan);
+  }
+
+  .err-divider {
+    width: 40px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Animated path text */
+  .err-path {
+    font-size: 11px;
+    color: var(--border);
+    letter-spacing: 0.08em;
+    font-style: italic;
+  }
+
+  .err-path span {
+    color: var(--muted);
+  }
+
+  .back-btn {
+    margin-top: 8px;
+  }
+</style>
+{% endblock %}
+
+{% block nav_right %}
+<a href="/" class="btn btn-ghost">[ ← LIBRARY ]</a>
+{% endblock %}
+
+{% block content %}
+<div class="error-page">
+  <div class="err-code">404</div>
+  <div class="err-label">// page not found</div>
+  <div class="err-divider"></div>
+  <p class="err-msg">
+    the document or route you're looking for<br>
+    <span>does not exist</span> in this system
+  </p>
+  <p class="err-path">
+    <span>requested:</span> <span id="errPath"></span>
+  </p>
+  <a href="/" class="btn back-btn">[ ← RETURN TO LIBRARY ]</a>
+</div>
+
+<script>
+  document.getElementById('errPath').textContent = window.location.pathname;
+</script>
+{% endblock %}

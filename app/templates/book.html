@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+
+{% block title %}ELUCIDATE // READER{% endblock %}
+
+{% block nav_items %}
+<a href="/" class="nav-item">LIBRARY</a>
+{% endblock %}
+
+{% block head %}
+<style>
+  html, body { height: 100%; overflow: hidden; }
+
+  .workspace {
+    display: flex;
+    height: calc(100vh - 52px);
+  }
+
+  /* ── PDF Panel ── */
+  .panel-pdf {
+    width: 420px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    height: 38px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .ph-label { font-size: 9px; letter-spacing: 0.18em; color: var(--muted); text-transform: uppercase; }
+  .ph-sep   { color: var(--border-2); font-size: 10px; }
+  .ph-name  { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+
+  .pdf-frame { flex: 1; width: 100%; border: none; background: var(--bg); display: block; }
+
+  /* ── Resizer ── */
+  .resizer { width: 3px; background: var(--border); cursor: col-resize; flex-shrink: 0; transition: background 0.15s; }
+  .resizer:hover { background: var(--border-2); }
+
+  /* ── Chat Panel ── */
+  .panel-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .chat-header {
+    padding: 12px 18px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .chat-heading { font-size: 9px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+  .chat-subheading { font-size: 12px; color: var(--dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .model-selector {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .model-label {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .model-select {
+    font-family: var(--font);
+    font-size: 11px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border-2);
+    padding: 3px 8px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    transition: border-color 0.15s;
+  }
+
+  .model-select:hover  { border-color: var(--muted); }
+  .model-select:focus  { border-color: var(--cyan); }
+
+  .model-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+
+  .model-dot.switching { background: var(--cyan); box-shadow: 0 0 6px var(--cyan-glow); }
+
+  /* ── Messages ── */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .msg { max-width: 88%; animation: fadeUp 0.2s ease both; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-user { align-self: flex-end; }
+  .msg-ai   { align-self: flex-start; }
+
+  .msg-label { font-size: 9px; letter-spacing: 0.15em; margin-bottom: 4px; text-transform: uppercase; color: var(--muted); }
+  .msg-user .msg-label { text-align: right; color: var(--cyan); }
+
+  .msg-bubble { padding: 9px 13px; font-size: 12px; line-height: 1.65; }
+
+  .msg-user .msg-bubble {
+    background: var(--cyan-dim);
+    border: 1px solid rgba(0,212,255,0.2);
+    color: var(--bright);
+    text-align: right;
+  }
+
+  .msg-ai .msg-bubble {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--border-2);
+    color: var(--text);
+    padding-left: 16px;
+  }
+
+  .thinking .msg-bubble { color: var(--muted); font-style: italic; }
+
+  .cursor-blink::after {
+    content: '_';
+    animation: blink 0.8s step-end infinite;
+    color: var(--cyan);
+    margin-left: 1px;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* ── Welcome ── */
+  .welcome-msg {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; gap: 10px;
+    color: var(--muted); text-align: center; padding: 24px;
+  }
+  .welcome-msg .wm-icon { font-size: 28px; color: var(--border-2); font-weight: 300; }
+  .welcome-msg p { font-size: 11px; letter-spacing: 0.08em; line-height: 1.9; }
+
+  /* ── Init banner ── */
+  .init-banner {
+    display: none; padding: 7px 18px;
+    background: var(--cyan-dim); border-bottom: 1px solid rgba(0,212,255,0.15);
+    font-size: 10px; letter-spacing: 0.08em; color: var(--cyan); flex-shrink: 0;
+  }
+  .init-banner.visible { display: block; }
+
+  /* ── Input area ── */
+  .chat-input-area {
+    border-top: 1px solid var(--border);
+    padding: 12px; background: var(--surface); flex-shrink: 0;
+  }
+
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+
+  .chat-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border-2);
+    color: var(--bright); font-family: var(--font); font-size: 12px;
+    padding: 9px 12px; resize: none; height: 40px; max-height: 100px;
+    line-height: 1.5; transition: border-color 0.15s, box-shadow 0.15s; overflow: hidden;
+  }
+  .chat-input:focus {
+    outline: none;
+    border-color: var(--muted);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .chat-input::placeholder { color: var(--muted); }
+
+  .ask-btn {
+    font-family: var(--font); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.06em; color: var(--cyan); background: transparent;
+    border: 1px solid var(--cyan); padding: 0 14px; height: 40px;
+    cursor: pointer; transition: background 0.15s, box-shadow 0.15s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .ask-btn:hover:not(:disabled) { background: var(--cyan-dim); box-shadow: 0 0 12px var(--cyan-glow); }
+  .ask-btn:disabled { opacity: 0.3; cursor: default; border-color: var(--border); color: var(--muted); }
+
+  .status-bar {
+    padding: 4px 18px; font-size: 9px; letter-spacing: 0.12em;
+    color: var(--muted); border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="workspace">
+
+  <!-- Left: PDF -->
+  <div class="panel-pdf" id="pdfPanel">
+    <div class="panel-header">
+      <span class="ph-label">viewer</span>
+      <span class="ph-sep">//</span>
+      <span class="ph-name" id="pdfNameHeader">loading...</span>
+    </div>
+    <iframe class="pdf-frame" id="pdfFrame" src="" title="PDF Viewer"></iframe>
+  </div>
+
+  <div class="resizer" id="resizer"></div>
+
+  <!-- Right: Chat (darker lower tone) -->
+  <div class="panel-chat" id="chatPanel">
+    <div class="chat-header">
+      <div class="chat-heading">// ask anything</div>
+      <div class="chat-subheading" id="chatSubheading">—</div>
+      <div class="model-selector">
+        <span class="model-label">model</span>
+        <span class="model-dot" id="modelDot"></span>
+        <select class="model-select" id="modelSelect" onchange="switchModel(this.value)">
+          <option>loading...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="init-banner" id="initBanner">
+      // indexing document<span class="cursor-blink"></span>
+    </div>
+
+    <div class="messages" id="messagesArea">
+      <div class="welcome-msg" id="welcomeMsg">
+        <span class="wm-icon">[ ? ]</span>
+        <p>// ask a question about<br>the document on the left</p>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="input-row">
+        <textarea class="chat-input" id="chatInput" placeholder="// type your question..." rows="1"></textarea>
+        <button class="ask-btn" id="askBtn" onclick="sendQuestion()">[ ASK → ]</button>
+      </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">// ready</div>
+  </div>
+</div>
+
+<script>
+  let pdfName   = '';
+  let isLoading = false;
+
+  function init() {
+    const path = window.location.pathname;
+    pdfName    = decodeURIComponent(path.replace(/^\//, ''));
+    if (!pdfName) { setStatus('// error: no document specified'); return; }
+
+    document.getElementById('pdfNameHeader').textContent  = pdfName;
+    document.getElementById('chatSubheading').textContent = pdfName.replace(/\.pdf$/i, '');
+    document.title = 'ELUCIDATE // ' + pdfName.replace(/\.pdf$/i, '').toUpperCase();
+    document.getElementById('pdfFrame').src = '/pdf/' + encodeURIComponent(pdfName);
+    initialisePdf();
+  }
+
+  async function initialisePdf() {
+    document.getElementById('initBanner').classList.add('visible');
+    setStatus('// indexing document...');
+    try {
+      const fd = new FormData();
+      fd.append('pdf_name', pdfName);
+      const res = await fetch('/api/initialise', { method: 'POST', body: fd });
+      setStatus(res.ok ? '// ready' : '// index error — queries may not work');
+    } catch(e) {
+      setStatus('// could not index document');
+    } finally {
+      document.getElementById('initBanner').classList.remove('visible');
+    }
+  }
+
+  async function sendQuestion() {
+    if (isLoading) return;
+    const input = document.getElementById('chatInput');
+    const q = input.value.trim();
+    if (!q) return;
+
+    input.value = '';
+    autoResize(input);
+
+    const welcome = document.getElementById('welcomeMsg');
+    if (welcome) welcome.remove();
+
+    appendMsg('user', q);
+    isLoading = true;
+    setBtnState(true);
+    setStatus('// Cerebrating...');
+    const thinkId = appendThinking();
+
+    try {
+      const fd = new FormData();
+      fd.append('question', q);
+      fd.append('pdf_name', pdfName);
+      const res = await fetch('/api/ask', { method: 'POST', body: fd });
+      removeThinking(thinkId);
+
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('text/plain') || ct.includes('text/event-stream')) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          const msgEl = appendMsg('ai', '');
+          const bubble = msgEl.querySelector('.msg-bubble');
+          bubble.classList.add('cursor-blink');
+          let full = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            full += decoder.decode(value, { stream: true });
+            bubble.textContent = full;
+            scrollToBottom();
+          }
+          bubble.classList.remove('cursor-blink');
+        } else {
+          const data = await res.json();
+          appendMsg('ai', data.answer || data.response || JSON.stringify(data));
+        }
+        setStatus('// ready');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        appendMsg('ai', '// error: ' + (err.error || res.statusText));
+        setStatus('// error');
+      }
+    } catch(e) {
+      removeThinking(thinkId);
+      appendMsg('ai', '// request failed: ' + e.message);
+      setStatus('// error');
+    } finally {
+      isLoading = false;
+      setBtnState(false);
+    }
+  }
+
+  function appendMsg(role, text) {
+    const area = document.getElementById('messagesArea');
+    const w = document.createElement('div');
+    w.className = 'msg msg-' + (role === 'user' ? 'user' : 'ai');
+    const lbl = document.createElement('div');
+    lbl.className = 'msg-label';
+    lbl.textContent = role === 'user' ? '// you' : '// elucidate';
+    const bbl = document.createElement('div');
+    bbl.className = 'msg-bubble';
+    bbl.textContent = text;
+    w.appendChild(lbl); w.appendChild(bbl);
+    area.appendChild(w);
+    scrollToBottom();
+    return w;
+  }
+
+  let thinkCounter = 0;
+  function appendThinking() {
+    const id = 'think-' + (++thinkCounter);
+    const area = document.getElementById('messagesArea');
+    const w = document.createElement('div');
+    w.className = 'msg msg-ai thinking'; w.id = id;
+    const lbl = document.createElement('div');
+    lbl.className = 'msg-label'; lbl.textContent = '// elucidate';
+    const bbl = document.createElement('div');
+    bbl.className = 'msg-bubble cursor-blink'; bbl.textContent = 'thinking';
+    w.appendChild(lbl); w.appendChild(bbl);
+    area.appendChild(w); scrollToBottom();
+    return id;
+  }
+
+  function removeThinking(id) { const el = document.getElementById(id); if (el) el.remove(); }
+  function scrollToBottom() { const a = document.getElementById('messagesArea'); a.scrollTop = a.scrollHeight; }
+  function setStatus(msg) { document.getElementById('statusBar').textContent = msg; }
+  function setBtnState(d) { document.getElementById('askBtn').disabled = d; }
+
+  function autoResize(el) {
+    el.style.height = '40px';
+    el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    el.style.overflow = el.scrollHeight > 100 ? 'auto' : 'hidden';
+  }
+
+  document.getElementById('chatInput').addEventListener('input', function() { autoResize(this); });
+  document.getElementById('chatInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuestion(); }
+  });
+
+  // Drag resizer
+  const resizer = document.getElementById('resizer');
+  const pdfPanel = document.getElementById('pdfPanel');
+  let dragging = false, startX = 0, startW = 0;
+
+  resizer.addEventListener('mousedown', (e) => {
+    dragging = true; startX = e.clientX;
+    startW = pdfPanel.getBoundingClientRect().width;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const newW = Math.max(280, Math.min(startW + e.clientX - startX, window.innerWidth - 300));
+    pdfPanel.style.flex = 'none';
+    pdfPanel.style.width = newW + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+
+  // ── Model selector ───────────────────────────────────────
+  async function loadModels() {
+    try {
+      const res  = await fetch('/api/models');
+      const data = await res.json();
+      const sel  = document.getElementById('modelSelect');
+      sel.innerHTML = '';
+      data.models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        if (m === data.active) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    } catch(e) {
+      document.getElementById('modelSelect').innerHTML = '<option>unavailable</option>';
+    }
+  }
+
+  async function switchModel(model) {
+    const dot = document.getElementById('modelDot');
+    dot.classList.add('switching');
+    try {
+      await fetch('/api/model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model })
+      });
+    } finally {
+      setTimeout(() => dot.classList.remove('switching'), 800);
+    }
+  }
+
+  init();
+  loadModels();
+</script>
+{% endblock %}

@@ -108,7 +108,47 @@ docker compose up --build
 
 ## Configuration
 
-All values are read from environment variables with sensible defaults. Override them in `docker-compose.yml` or export them before running locally.
+All values are read from environment variables with sensible defaults.
+
+### Local — using a `.env` file
+
+Create a `.env` file in the project root to override defaults without touching code:
+
+```bash
+# .env
+LLM_MODEL=llama3.1:8b
+CHUNK_SIZE=2000
+CHUNK_OVERLAP=250
+TOP_K=10
+OLLAMA_CONTEXT_LENGTH=8192
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+Then load it before running:
+
+```bash
+export $(cat .env | xargs) && python -m app.Elucidate
+```
+
+Or if you use `python-dotenv`, it will be picked up automatically.
+
+### Docker — via `docker-compose.yml`
+
+Edit the `environment:` block under the `elucidate` service in `docker-compose.yml`:
+
+```yaml
+environment:
+  - LLM_MODEL=llama3.1:8b
+  - CHUNK_SIZE=1500
+  - TOP_K=8
+```
+
+Then rebuild:
+```bash
+docker compose up --build
+```
+
+### All variables
 
 | Variable | Local Default | Docker Default | Description |
 |----------|--------------|----------------|-------------|
@@ -145,6 +185,7 @@ Elucidate/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .dockerignore             # Excludes .venv, __pycache__, chroma_db, .git
+├── .env                      # Local env overrides (create this, not committed)
 ├── pdf/                      # Uploaded PDFs (auto-created)
 ├── chroma_db/                # Vector database (persisted via Docker volume)
 ├── tokens.json               # Cumulative token usage per PDF

@@ -6,7 +6,7 @@ import ingest.config as config
 import ingest.ingest as ingestor
 import ingest.query as query
 
-dir_path    = os.path.join(os.path.dirname(__file__), '..', 'pdf')
+dir_path = os.path.join(os.path.dirname(__file__), '..', 'pdf')
 tokens_path = os.path.join(os.path.dirname(__file__), '..', 'tokens.json')
 
 active_state = {
@@ -36,8 +36,6 @@ def get_active_model():
     return _active_model
 
 
-# ── Token tracking ───────────────────────────────────────────
-
 def _load_tokens():
     if os.path.exists(tokens_path):
         with open(tokens_path) as f:
@@ -52,12 +50,10 @@ def _save_tokens(data):
 
 def add_tokens(pdf_name, count):
     data = _load_tokens()
-    key  = pdf_name.replace(".pdf", "").lower()
+    key = pdf_name.replace(".pdf", "").lower()
     data[key] = data.get(key, 0) + count
     _save_tokens(data)
 
-
-# ── PDF management ───────────────────────────────────────────
 
 def get_pdf_list():
     token_data = _load_tokens()
@@ -75,13 +71,18 @@ def get_pdf_list():
 def initialize_pdf(pdf_name):
     global active_state
 
-    pdf_path        = os.path.join(dir_path, pdf_name)
-    collection_name = pdf_name.replace(" ", "_").replace(".pdf", "").lower()
+    pdf_path = os.path.join(dir_path, pdf_name)
+    import re
+    collection_name = pdf_name.replace(".pdf", "").lower()
+    collection_name = re.sub(r"[^a-zA-Z0-9._-]", "_", collection_name)
+    collection_name = re.sub(r"_+", "_", collection_name).strip("_-.")
+    if not collection_name:
+        collection_name = "collection"
 
     collection, status = ingestor.initialise(pdf_path, collection_name)
 
     active_state["collection_id"] = collection_name
-    active_state["collection"]    = collection
+    active_state["collection"] = collection
 
     _warmup()
 

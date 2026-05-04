@@ -7,3 +7,5 @@ CLAUDE.md
 .env.local
 .idea
 .DS_Store
+.env
+pdf/*
